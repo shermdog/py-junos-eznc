@@ -58,6 +58,7 @@ Guest Operating Systems
 - Ubuntu 12.04
 - Ubuntu 12.10
 - Ubuntu 13.10
+- Ubuntu 14.14
 - Fedora 19
 - Fedora 20
 - CentOS 6.5
