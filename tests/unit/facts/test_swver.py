@@ -16,7 +16,7 @@ from ncclient.transport import SSHSession
 class TestVersionInfo(unittest.TestCase):
 
     def test_version_info_after_type_len_else(self):
-        self.assertIsNone(version_info('12.1X46-D10').build)
+        self.assertEqual(version_info('12.1X46-D10').build, None)
 
     def test_version_info_constructor_else_exception(self):
         self.assertEqual(version_info('11.4R7').build, '7')
@@ -27,16 +27,16 @@ class TestVersionInfo(unittest.TestCase):
                          'type=R, minor=7, build=5)')
 
     def test_version_info_lt(self):
-        self.assertLess(version_info('13.3-20131120'), (14, 1))
+        self.assertTrue(version_info('13.3-20131120') < (14, 1))
 
     def test_version_info_lt_eq(self):
-        self.assertLessEqual(version_info('13.3-20131120'), (14, 1))
+        self.assertTrue(version_info('13.3-20131120') <= (14, 1))
 
     def test_version_info_gt(self):
-        self.assertGreater(version_info('13.3-20131120'), (12, 1))
+        self.assertTrue(version_info('13.3-20131120') > (12, 1))
 
     def test_version_info_gt_eq(self):
-        self.assertGreaterEqual(version_info('13.3-20131120'), (12, 1))
+        self.assertTrue(version_info('13.3-20131120') >= (12, 1))
 
     def test_version_info_eq(self):
         self.assertEqual(version_info('13.3-20131120'), (13, 3))
@@ -60,6 +60,13 @@ class TestSrxCluster(unittest.TestCase):
     def test_swver(self, mock_execute):
         mock_execute.side_effect = self._mock_manager
         self.facts['master'] = 'RE0'
+        software_version(self.dev, self.facts)
+        self.assertEqual(self.facts['version'], '12.3R6.6')
+
+    @patch('jnpr.junos.Device.execute')
+    def test_swver_f_master_list(self, mock_execute):
+        mock_execute.side_effect = self._mock_manager
+        self.facts['master'] = ['RE0', 'RE1']
         software_version(self.dev, self.facts)
         self.assertEqual(self.facts['version'], '12.3R6.6')
 

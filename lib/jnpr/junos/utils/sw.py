@@ -2,6 +2,7 @@
 import hashlib
 import re
 from os import path
+import logging
 
 # 3rd-party modules
 from lxml.builder import E
@@ -48,8 +49,6 @@ class SW(Util):
         self._RE_list = [
             x for x in dev.facts.keys() if x.startswith('version_RE')]
         self._multi_RE = bool(len(self._RE_list) > 1)
-        self._multi_MX = bool(
-            dev.facts['personality'] == "MX" and self._multi_RE is True)
         self._multi_VC = bool(
             self._multi_RE is True and dev.facts.get('vc_capable') is True)
 
@@ -130,8 +129,14 @@ class SW(Util):
                     "%s: %s / %s (%s%%)" %
                     (_path, _xfrd, _total, str(pct)))
 
-        # execute the secure-copy with the Python SCP module
+        # check for the logger barncale for 'paramiko.transport'
+        plog = logging.getLogger('paramiko.transport')
+        if not plog.handlers: 
+            class NullHandler(logging.Handler):
+                def emit(self, record): pass
+            plog.addHandler(NullHandler())
 
+        # execute the secure-copy with the Python SCP module
         with SCP(self._dev, progress=_scp_progress) as scp:            
             scp.put(package, remote_path)
 
@@ -154,6 +159,8 @@ class SW(Util):
           any additional parameters to the 'request' command can
           be passed within kvargs, following the RPC syntax
           methodology (dash-2-underscore,etc.)
+
+        .. todo:: Add way to notify user why installation failed.
         """
 
         args = dict(no_validate=True, package_name=remote_package)
@@ -167,7 +174,8 @@ class SW(Util):
 
         got = rsp.getparent()
         rc = int(got.findtext('package-result').strip())
-        return True if rc == 0 else got.findtext('output').strip()
+        #return True if rc == 0 else got.findtext('output').strip()
+        return True if rc == 0 else False
 
     # -------------------------------------------------------------------------
     # validate - perform 'request' operation to validate the package
@@ -342,17 +350,7 @@ class SW(Util):
             return add_ok
         else:
             # we need to update multiple devices
-            if self._multi_MX is True:
-                ok = True
-                _progress(
-                    "installing software on RE0 ... please be patient ...")
-                ok &= self.pkgadd(remote_package, re0=True)
-                _progress(
-                    "installing software on RE1 ... please be patient ...")
-                ok &= self.pkgadd(remote_package, re1=True)
-                dev.timeout = restore_timeout
-                return ok
-            elif self._multi_VC is True:
+            if self._multi_VC is True:
                 ok = True
                 # extract the VC number out of the 'version_RE<n>' string
                 vc_members = [
@@ -361,9 +359,21 @@ class SW(Util):
                         x).group(1) for x in self._RE_list]
                 for vc_id in vc_members:
                     _progress(
-                        "installing software on VC member: {} ... please be"
+                        "installing software on VC member: {0} ... please be"
                         " patient ...".format(vc_id))
                     ok &= self.pkgadd(remote_package, member=vc_id)
+                dev.timeout = restore_timeout
+                return ok
+            else:
+                # then this is a device with two RE that supports the "re0"
+                # and "re1" options to the command (M, MX tested only)
+                ok = True
+                _progress(
+                    "installing software on RE0 ... please be patient ...")
+                ok &= self.pkgadd(remote_package, re0=True)
+                _progress(
+                    "installing software on RE1 ... please be patient ...")
+                ok &= self.pkgadd(remote_package, re1=True)
                 dev.timeout = restore_timeout
                 return ok
 
@@ -375,14 +385,13 @@ class SW(Util):
         """
         Perform a system reboot, with optional delay (in minutes).
 
-        If the device is an MX with dual-RE installed, then both RE will be
-        rebooted.
+        If the device is equipped with dual-RE, then both RE will be
+        rebooted.  This code also hanldes EX/QFX VC.
         """
         cmd = E('request-reboot', E('in', str(in_min)))
 
-        if self._multi_MX is True:
+        if self._multi_RE is True and self._multi_VC is False:
             cmd.append(E('both-routing-engines'))
-
         try:
             rsp = self.rpc(cmd)
             got = rsp.getparent().findtext('.//request-reboot-status').strip()
@@ -399,14 +408,13 @@ class SW(Util):
         """
         Perform a system shutdown, with optional delay (in minutes) .
 
-        If the device is an MX with dual-RE installed, then both RE will be
-        rebooted.
+        If the device is equipped with dual-RE, then both RE will be
+        rebooted.  This code also hanldes EX/QFX VC.
         """
         cmd = E('request-power-off', E('in', str(in_min)))
 
-        if self._multi_MX is True:
+        if self._multi_RE is True and self._multi_VC is False:
             cmd.append(E('both-routing-engines'))
-
         try:
             rsp = self.rpc(cmd)
             return rsp.getparent().findtext('.//request-reboot-status').strip()
