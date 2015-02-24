@@ -7,6 +7,7 @@ from jnpr.junos.facts.switch_style import facts_switch_style
 from jnpr.junos.facts.session import facts_session
 from jnpr.junos.facts.srx_cluster import facts_srx_cluster
 from jnpr.junos.facts.domain import facts_domain
+from jnpr.junos.facts.commit import facts_commit
 
 FACT_LIST = [
     facts_chassis,                  # first
@@ -18,7 +19,8 @@ FACT_LIST = [
     facts_domain,
     facts_ifd_style,
     facts_switch_style,
-    facts_session
+    facts_session,
+    facts_commit
 ]
 
 __all__ = ['FACT_LIST']
