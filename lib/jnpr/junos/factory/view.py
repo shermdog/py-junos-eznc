@@ -6,6 +6,13 @@ import json
 
 from jnpr.junos.factory.viewfields import ViewFields
 from jnpr.junos.factory.to_json import TableViewJSONEncoder
+from __builtin__ import str
+
+
+class RTest(str):
+
+    def deactivate(self):
+        print 'deactivate'
 
 
 class View(object):
@@ -197,6 +204,9 @@ class View(object):
         """
         return json.dumps(self, cls=TableViewJSONEncoder)
 
+    def deactivate(self, name):
+        print 'deactivate '.join(name)
+
     # -------------------------------------------------------------------------
     # OVERLOADS
     # -------------------------------------------------------------------------
@@ -249,7 +259,7 @@ class View(object):
             def _munch(x):
                 as_str = x if isinstance(x, str) else x.text
                 if isinstance(as_str, unicode):
-                    as_str = as_str.encode('ascii','replace')
+                    as_str = as_str.encode('ascii', 'replace')
                 if as_str is not None:
                     as_str = as_str.strip()
                 if not as_str:
@@ -271,4 +281,29 @@ class View(object):
         allow the caller to extract field values using :obj['name']:
         the same way they would do :obj.name:
         """
+        # return RTest(getattr(self, name))
         return getattr(self, name)
+
+    def __setitem__(self, name, value):
+        print name
+        print value
+
+        item = self.FIELDS.get(name)
+        if item is None:
+            raise ValueError("Unknown field: '%s'" % name)
+
+        if 'table' in item:
+            # if this is a sub-table, then return that now
+            return item['table'](self.D, self._xml)
+
+        # otherwise, not a sub-table, and handle the field
+        astype = item.get('astype', str)
+        if 'group' in item:
+            if item['group'] in self._groups:
+                found = self._groups[item['group']].xpath(item['xpath'])
+            else:
+                return
+        else:
+            found = self._xml.xpath(item['xpath'])
+
+        len_found = len(found)
